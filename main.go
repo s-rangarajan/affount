@@ -2,11 +2,16 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"os"
 	"os/signal"
 	"time"
+
+	"go.uber.org/zap"
 )
+
+var logger *zap.SugaredLogger
 
 const (
 	httpServerAddressEnvVar = "HTTP_ADDRESS"
@@ -14,6 +19,14 @@ const (
 )
 
 func main() {
+	logger = zap.NewExample().Sugar()
+	logger.Info("lesgo")
+
+	// dbServer, pool := MustSetupDB()
+	pool := MustSetupRealDB()
+
+	logger.Info("database setup")
+
 	httpServerAddress := MustLoadEnvVar(httpServerAddressEnvVar)
 
 	mainCtx, mainCancel := context.WithCancel(context.Background())
@@ -22,28 +35,48 @@ func main() {
 	defer signalCancel()
 
 	http.HandleFunc("/health-check", func(w http.ResponseWriter, r *http.Request) {
-		return
+		pingContext, pingCancel := context.WithTimeout(mainCtx, 100*time.Millisecond)
+		defer pingCancel()
+		if err := pool.PingContext(pingContext); err != nil {
+			logger.Error(err)
+			w.WriteHeader(http.StatusInternalServerError)
+
+			return
+		}
 	})
-	http.HandleFunc("/hold", func(w http.ResponseWriter, r *http.Request) {
-		HoldWithContext(mainCtx, haversineEstimator, w, r)
+	http.HandleFunc("/create_account", func(w http.ResponseWriter, r *http.Request) {
+		createContext, creationCancel := context.WithTimeout(mainCtx, 100*time.Millisecond)
+		defer creationCancel()
+
+		w.Header().Set("Content-Type", "application/json")
+		HandleCreateAccountWithContext(createContext, pool, w, r)
 	})
-	http.HandleFunc("/update_hold", func(w http.ResponseWriter, r *http.Request) {
-		UpdateHoldWithContext(mainCtx, haversineEstimator, w, r)
+	http.HandleFunc("/execute_operations", func(w http.ResponseWriter, r *http.Request) {
+		executeContext, executionCancel := context.WithTimeout(mainCtx, 500*time.Millisecond)
+		defer executionCancel()
+
+		w.Header().Set("Content-Type", "application/json")
+		HandleExecuteOperationsWithContext(executeContext, pool, w, r)
 	})
-	http.HandleFunc("/credit", func(w http.ResponseWriter, r *http.Request) {
-		CreditWithContext(mainCtx, haversineEstimator, w, r)
+	http.HandleFunc("/get_account", func(w http.ResponseWriter, r *http.Request) {
+		getContext, getCancel := context.WithTimeout(mainCtx, 100*time.Millisecond)
+		defer getCancel()
+
+		w.Header().Set("Content-Type", "application/json")
+		HandleGetAccountWithContext(getContext, pool, w, r)
 	})
-	http.HandleFunc("/capture", func(w http.ResponseWriter, r *http.Request) {
-		CaptureWithContext(mainCtx, haversineEstimator, w, r)
-	})
-	http.HandleFunc("/release", func(w http.ResponseWriter, r *http.Request) {
-		ReleaseWithContext(mainCtx, haversineEstimator, w, r)
+	http.HandleFunc("/get_transaction", func(w http.ResponseWriter, r *http.Request) {
+		getContext, getCancel := context.WithTimeout(mainCtx, 100*time.Millisecond)
+		defer getCancel()
+
+		w.Header().Set("Content-Type", "application/json")
+		HandleGetTransactionWithContext(getContext, pool, w, r)
 	})
 
 	server := &http.Server{Addr: httpServerAddress, Handler: http.DefaultServeMux}
 	go func() {
 		if err := server.ListenAndServe(); err != http.ErrServerClosed {
-			panic("error closing listeners")
+			logger.Errorf("error cycling server: %w", err)
 		}
 	}()
 
@@ -63,8 +96,13 @@ func main() {
 	shutdownCtx, shutdownCancel := context.WithTimeout(mainCtx, shutdownGracePeriod)
 	defer shutdownCancel()
 	if err := server.Shutdown(shutdownCtx); err != nil {
-		panic(err)
+		logger.Errorf("error shutting down server: %w", err)
 	}
+
+	pool.Close()
+	// if err := dbServer.Stop(); err != nil {
+	// 	logger.Fatal(err)
+	// }
 }
 
 // MustLoadEnvVar takes an input env variable
@@ -77,4 +115,17 @@ func MustLoadEnvVar(envVar string) string {
 	}
 
 	return value
+}
+
+func writeHTTPError(w http.ResponseWriter, statusCode int, err error) {
+	w.WriteHeader(statusCode)
+
+	errorResponse := struct {
+		Errors string `json:"error"`
+	}{
+		err.Error(),
+	}
+
+	b, _ := json.Marshal(errorResponse)
+	w.Write(b)
 }
