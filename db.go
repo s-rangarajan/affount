@@ -393,19 +393,23 @@ func MustSetupRealDB() *sql.DB {
 }
 
 func connect() (*sql.DB, error) {
-	db, err := sql.Open("postgres", "postgres://postgres:postgres@127.0.0.1:5433/postgres?sslmode=disable")
+	pool, err := sql.Open("postgres", "postgres://postgres:postgres@127.0.0.1:5433/postgres?sslmode=disable")
 	if err != nil {
 		logger.Fatal("error connecting to database: ", err)
 	}
 
-	return db, err
+	return pool, err
 }
 
 func connectReal() (*sql.DB, error) {
-	db, err := sql.Open("postgres", "postgres://postgres:@127.0.0.1:5432/postgres?sslmode=disable")
+	pool, err := sql.Open("postgres", "postgres://postgres:@127.0.0.1:5432/postgres?sslmode=disable")
+	pool.SetConnMaxIdleTime(0)
+	pool.SetConnMaxLifetime(0)
+	pool.SetMaxIdleConns(1000)
+	pool.SetMaxOpenConns(1000)
 	if err != nil {
 		logger.Fatal("error connecting to database: ", err)
 	}
 
-	return db, err
+	return pool, err
 }

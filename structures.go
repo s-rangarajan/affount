@@ -57,12 +57,12 @@ func (account Account) Play(transaction Transaction, operations []Operation) (Pl
 	playedOperations := make([]Operation, len(operations))
 	playedEvents := make([]Event, len(playedOperations))
 
-	logger.Infow("playing operations", "account", account, "transaction", transaction, "operations", operations)
+	//logger.Infow("playing operations", "account", account, "transaction", transaction, "operations", operations)
 
 	for i := range operations {
 		// primitives only, copied by value
 		playedOperation := operations[i]
-		logger.Infow("playing operation", "account", playedAccount, "transaction", playedTransaction, "operation", playedOperation)
+		//logger.Infow("playing operation", "account", playedAccount, "transaction", playedTransaction, "operation", playedOperation)
 
 		operationType, err := playedOperation.Type()
 		if err != nil {
@@ -109,7 +109,7 @@ func (account Account) Play(transaction Transaction, operations []Operation) (Pl
 		playedTransaction.LastPlayedSequence += 1
 		playedOperation.Sequence = playedTransaction.LastPlayedSequence
 		playedOperations[i] = playedOperation
-		logger.Infow("played operation", "account", playedAccount, "transaction", playedTransaction, "operation", playedOperation)
+		//logger.Infow("played operation", "account", playedAccount, "transaction", playedTransaction, "operation", playedOperation)
 		event := Event{
 			AccountID:      account.AccountID,
 			Sequence:       playedAccount.LastPlayedSequence,

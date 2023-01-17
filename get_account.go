@@ -21,24 +21,25 @@ func HandleGetAccountWithContext(ctx context.Context, pool *sql.DB, w http.Respo
 
 	tx, err := pool.BeginTx(ctx, nil)
 	if err != nil {
+		logger.Errorf("error beginning get account transaction: %s", err.Error())
 		writeHTTPError(w, http.StatusInternalServerError, fmt.Errorf("error beginning transaction: %w", err))
 		return
 	}
 	defer func() {
-		if err := tx.Rollback(); err != nil {
-			logger.Errorf("error cleaning up transaction: %s", err.Error())
-		}
+		tx.Rollback()
 	}()
 
 	logger.Infow("handling get account request", "account_id", accountID)
 	account, err := GetAccountWithContext(ctx, tx, accountID)
 	if err != nil {
+		logger.Errorf("error executing get account database operations: %s", err.Error())
 		writeHTTPError(w, http.StatusInternalServerError, fmt.Errorf("error executing database operations: %w", err))
 		debug.PrintStack()
 		return
 	}
 
 	if err := tx.Commit(); err != nil {
+		logger.Errorf("error committing get account transaction: %s", err.Error())
 		writeHTTPError(w, http.StatusInternalServerError, fmt.Errorf("error committing database state: %w", err))
 		debug.PrintStack()
 		return
@@ -46,6 +47,7 @@ func HandleGetAccountWithContext(ctx context.Context, pool *sql.DB, w http.Respo
 
 	marshaledAccount, err := json.Marshal(account)
 	if err != nil {
+		logger.Errorf("error marshaling get account response: %s", err.Error())
 		writeHTTPError(w, http.StatusInternalServerError, fmt.Errorf("error marshaling response: %w", err))
 		debug.PrintStack()
 		return

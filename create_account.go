@@ -35,24 +35,25 @@ func HandleCreateAccountWithContext(ctx context.Context, pool *sql.DB, w http.Re
 	logger.Infow("handling create account request", "request", req)
 	tx, err := pool.BeginTx(ctx, nil)
 	if err != nil {
+		logger.Errorf("error beginning create account transaction: %s", err.Error())
 		writeHTTPError(w, http.StatusInternalServerError, fmt.Errorf("error beginning transaction: %w", err))
 		debug.PrintStack()
 		return
 	}
 	defer func() {
-		if err := tx.Rollback(); err != nil {
-			logger.Errorf("error cleaning up transaction: %s", err.Error())
-		}
+		tx.Rollback()
 	}()
 
 	account, err := CreateAccountWithContext(ctx, tx, req.UserARI)
 	if err != nil {
+		logger.Errorf("error executing create account database operations: %s", err.Error())
 		writeHTTPError(w, http.StatusInternalServerError, fmt.Errorf("error executing database operations: %w", err))
 		debug.PrintStack()
 		return
 	}
 
 	if err := tx.Commit(); err != nil {
+		logger.Errorf("error committing create account database state: %s", err.Error())
 		writeHTTPError(w, http.StatusInternalServerError, fmt.Errorf("error committing database state: %w", err))
 		debug.PrintStack()
 		return
@@ -60,6 +61,7 @@ func HandleCreateAccountWithContext(ctx context.Context, pool *sql.DB, w http.Re
 
 	marshaledAccount, err := json.Marshal(account)
 	if err != nil {
+		logger.Errorf("error marshaling create account response: %s", err.Error())
 		writeHTTPError(w, http.StatusInternalServerError, fmt.Errorf("error marshaling response: %w", err))
 		debug.PrintStack()
 		return

@@ -28,24 +28,25 @@ func HandleGetTransactionWithContext(ctx context.Context, pool *sql.DB, w http.R
 	logger.Infow("handling get transaction request", "transaction_id", transactionID, "tenant", tenant)
 	tx, err := pool.BeginTx(ctx, nil)
 	if err != nil {
+		logger.Errorf("error beginning get transaction transaction: %s", err.Error())
 		writeHTTPError(w, http.StatusInternalServerError, fmt.Errorf("error beginning transaction: %w", err))
 		debug.PrintStack()
 		return
 	}
 	defer func() {
-		if err := tx.Rollback(); err != nil {
-			logger.Errorf("error cleaning up transaction: %s", err.Error())
-		}
+		tx.Rollback()
 	}()
 
 	result, err := GetTransactionAndOperationsWithContext(ctx, tx, tenant, transactionID)
 	if err != nil {
+		logger.Errorf("error executing get transaction database operations: %s", err.Error())
 		writeHTTPError(w, http.StatusInternalServerError, fmt.Errorf("error executing database operations: %w", err))
 		debug.PrintStack()
 		return
 	}
 
 	if err := tx.Commit(); err != nil {
+		logger.Errorf("error committing get transaction transaction: %s", err.Error())
 		writeHTTPError(w, http.StatusInternalServerError, fmt.Errorf("error committing database state: %w", err))
 		debug.PrintStack()
 		return
@@ -53,6 +54,7 @@ func HandleGetTransactionWithContext(ctx context.Context, pool *sql.DB, w http.R
 
 	marshaledData, err := json.Marshal(result)
 	if err != nil {
+		logger.Errorf("error marshaling get transaction response: %s", err.Error())
 		writeHTTPError(w, http.StatusInternalServerError, fmt.Errorf("error marshaling response: %w", err))
 		debug.PrintStack()
 		return

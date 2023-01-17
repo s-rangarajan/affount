@@ -60,18 +60,18 @@ func HandleExecuteOperationsWithContext(ctx context.Context, pool *sql.DB, w htt
 	logger.Infow("handling execute operations request", "request", req)
 	tx, err := pool.BeginTx(ctx, nil)
 	if err != nil {
+		logger.Errorf("error beginning transaction for execute operations request: %s", err.Error())
 		writeHTTPError(w, http.StatusInternalServerError, fmt.Errorf("error beginning transaction: %w", err))
 		debug.PrintStack()
 		return
 	}
 	defer func() {
-		if err := tx.Rollback(); err != nil {
-			logger.Errorf("error cleaning up transaction: %s", err.Error())
-		}
+		tx.Rollback()
 	}()
 
 	account, err := LockAccountWithContext(ctx, tx, req.AccountID)
 	if err != nil {
+		logger.Errorf("error locking account for execute operations request: %s", err.Error())
 		writeHTTPError(w, http.StatusInternalServerError, fmt.Errorf("error executing database operations: %w", err))
 		debug.PrintStack()
 		return
@@ -81,7 +81,8 @@ func HandleExecuteOperationsWithContext(ctx context.Context, pool *sql.DB, w htt
 	if req.TransactionID != 0 {
 		transaction, err := GetTransactionWithContext(ctx, tx, req.Tenant, req.TransactionID)
 		if err != nil {
-			writeHTTPError(w, http.StatusInternalServerError, fmt.Errorf("error retrieving transaction data: %w", err))
+			logger.Errorf("error getting transaction for execute operations request: %s", err.Error())
+			writeHTTPError(w, http.StatusInternalServerError, fmt.Errorf("error executing database operations: %w", err))
 			debug.PrintStack()
 			return
 		}
@@ -96,6 +97,7 @@ func HandleExecuteOperationsWithContext(ctx context.Context, pool *sql.DB, w htt
 
 			marshaledData, err := json.Marshal(errorResult)
 			if err != nil {
+				logger.Errorf("error marshaling response for execute operations request: %s", err.Error())
 				writeHTTPError(w, http.StatusInternalServerError, fmt.Errorf("error marshaling response: %w", err))
 				debug.PrintStack()
 				return
@@ -114,6 +116,7 @@ func HandleExecuteOperationsWithContext(ctx context.Context, pool *sql.DB, w htt
 
 			marshaledData, err := json.Marshal(errorResult)
 			if err != nil {
+				logger.Errorf("error marshaling response for execute operations request: %s", err.Error())
 				writeHTTPError(w, http.StatusInternalServerError, fmt.Errorf("error marshaling response: %w", err))
 				debug.PrintStack()
 				return
@@ -124,12 +127,14 @@ func HandleExecuteOperationsWithContext(ctx context.Context, pool *sql.DB, w htt
 		}
 	}
 	if err != nil {
+		logger.Errorf("error processing operations for execute operations request: %s", err.Error())
 		writeHTTPError(w, http.StatusInternalServerError, fmt.Errorf("error processing operations: %w", err))
 		debug.PrintStack()
 		return
 	}
 
 	if err := tx.Commit(); err != nil {
+		logger.Errorf("error committing transaction for execute operations request: %s", err.Error())
 		writeHTTPError(w, http.StatusInternalServerError, fmt.Errorf("error committing database state: %w", err))
 		debug.PrintStack()
 		return
@@ -138,6 +143,7 @@ func HandleExecuteOperationsWithContext(ctx context.Context, pool *sql.DB, w htt
 
 	marshaledData, err := json.Marshal(result)
 	if err != nil {
+		logger.Errorf("error marshaling response for execute operations request: %s", err.Error())
 		writeHTTPError(w, http.StatusInternalServerError, fmt.Errorf("error marshaling response: %w", err))
 		debug.PrintStack()
 		return
