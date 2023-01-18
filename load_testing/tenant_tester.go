@@ -222,6 +222,7 @@ func (t TenantTester) RunExtendExistingTransasctionScenario() {
 			_, statusCode, err = ReadTransaction(t.Tenant, transactionID)
 			if statusCode > 200 {
 				log.Println("read transaction statuscode", statusCode)
+				log.Println("transaction_id", transactionID, "account_id", accountID)
 				t.httpReadTransactionErrorChan <- struct{}{}
 				return
 			}

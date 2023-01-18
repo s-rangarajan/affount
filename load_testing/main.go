@@ -9,6 +9,8 @@ import (
 	"net/http"
 	"sync"
 	"time"
+
+	"github.com/google/uuid"
 )
 
 type createAccountRequest struct {
@@ -65,10 +67,10 @@ var (
 	forwardOps                                   = []string{"RELEASE", "CREDIT"}
 	backwardOps                                  = []string{"HOLD", "DEBIT"}
 	tenantConfigs                                = []TenantConfig{
-		{Tenant: "DPLUS", RandomWalkP: 0.4, NewTransactionBias: 0.8, ReadBias: 0.2, TransactionLengthLimit: 10, Fanout: 5},
-		{Tenant: "REFUNDS", RandomWalkP: 0.9, NewTransactionBias: 0.9, ReadBias: 0.1, TransactionLengthLimit: 2, Fanout: 1},
-		{Tenant: "PAYNOW", RandomWalkP: 0.5, NewTransactionBias: 0.9, ReadBias: 0.3, TransactionLengthLimit: 10, Fanout: 1},
-		{Tenant: "DOUBLOON", RandomWalkP: 0.5, NewTransactionBias: 0.9, ReadBias: 0.4, TransactionLengthLimit: 2, Fanout: 1},
+		{Tenant: "DPLUS", RandomWalkP: 0.4, NewTransactionBias: 0.8, ReadBias: 0.2, TransactionLengthLimit: 10, Fanout: 10},
+		{Tenant: "REFUNDS", RandomWalkP: 0.9, NewTransactionBias: 0.9, ReadBias: 0.1, TransactionLengthLimit: 2, Fanout: 10},
+		{Tenant: "PAYNOW", RandomWalkP: 0.5, NewTransactionBias: 0.9, ReadBias: 0.3, TransactionLengthLimit: 10, Fanout: 10},
+		{Tenant: "DOUBLOON", RandomWalkP: 0.5, NewTransactionBias: 0.9, ReadBias: 0.4, TransactionLengthLimit: 2, Fanout: 10},
 	}
 )
 
@@ -85,6 +87,7 @@ func getRandomTransaction(accountID uint64, tenant string) uint64 {
 }
 
 func main() {
+	log.SetFlags(0)
 	log.Println("init load tests")
 
 	errChan := make(chan struct{}, 10000000)
@@ -98,13 +101,11 @@ func main() {
 		var errCount, httpReadAccountErrorCount, httpReadTransactionErrorCount, httpExecuteOperationsErrorCount, opSuccessCount, txnSuccessCount, readSuccessCount uint
 		go func() {
 			ticker := time.NewTicker(1000 * time.Millisecond)
+			log.Printf("errs,ReadAcctErrors,ReadTxnErrors,ExecOpsErrors,OpSuccesses,TxnSuccesses,ReadSuccesses")
 			for {
 				select {
 				case <-ticker.C:
-					log.Printf(
-						"errs: %d | ReadAcctErrors: %d | ReadTxnErrors: %d | ExecOpsErrors: %d | OpSuccesses: %d | TxnSuccesses: %d | ReadSuccesses: %d",
-						errCount, httpReadAccountErrorCount, httpReadTransactionErrorCount, httpExecuteOperationsErrorCount, opSuccessCount, txnSuccessCount, readSuccessCount,
-					)
+					log.Printf("%d,%d,%d,%d,%d,%d,%d", errCount, httpReadAccountErrorCount, httpReadTransactionErrorCount, httpExecuteOperationsErrorCount, opSuccessCount, txnSuccessCount, readSuccessCount)
 				}
 			}
 		}()
@@ -133,7 +134,7 @@ func main() {
 	log.Println("setting up accounts and transactions")
 	for i := 0; i < len(accountIDs); i++ {
 		log.Printf("processing account %d", i)
-		account, statusCode, err := CreateAccount(fmt.Sprintf("USER-%d-ARI", i))
+		account, statusCode, err := CreateAccount(uuid.New().String())
 		if err != nil {
 			log.Fatalf("error setting up accounts: %s", err.Error())
 		}
@@ -143,8 +144,8 @@ func main() {
 		accountIDs[i] = account.AccountID
 		accounts[account.AccountID] = make(map[string][]uint64)
 		for j := range tenantConfigs {
-			accounts[account.AccountID][tenantConfigs[j].Tenant] = make([]uint64, 100)
-			for k := 0; k < 10; k++ {
+			accounts[account.AccountID][tenantConfigs[j].Tenant] = make([]uint64, 10)
+			for k := 0; k < len(accounts[account.AccountID][tenantConfigs[j].Tenant]); k++ {
 				result, statusCode, err := CreateTransaction(account.AccountID, tenantConfigs[j].Tenant)
 				if err != nil {
 					log.Fatalf("error setting up transactions: %s", err.Error())

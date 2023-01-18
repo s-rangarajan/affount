@@ -310,13 +310,13 @@ func GetTransactionWithContext(ctx context.Context, tx *sql.Tx, tenant string, t
 func GetTransactionAndOperationsWithContext(ctx context.Context, tx *sql.Tx, tenant string, transactionID uint64) (TransactionWithOperations, error) {
 	query := `
 		SELECT transaction_pk,
-						transaction_id,
-						transactions.tenant,
-						account_id,
-						held_amount_in_cents,
-						debited_amount_in_cents,
-						credited_amount_in_cents,
-						last_played_sequence,
+						MAX(transaction_id),
+						MAX(tenant),
+						MAX(account_id),
+						MAX(held_amount_in_cents),
+						MAX(debited_amount_in_cents),
+						MAX(credited_amount_in_cents),
+						MAX(last_played_sequence),
 						JSON_AGG(
 							JSON_BUILD_OBJECT(
 								'operation_pk', operation_pk,
@@ -327,18 +327,36 @@ func GetTransactionAndOperationsWithContext(ctx context.Context, tx *sql.Tx, ten
 								'amount_in_cents', amount_in_cents,
 								'sequence', sequence
 							)
-						)
-		FROM transactions
-		JOIN operations USING(transaction_id, tenant)
-		WHERE transactions.tenant = $1
-		AND transactions.transaction_id = $2
-		GROUP BY transaction_pk
+						) AS operations
+		FROM (
+			SELECT transaction_pk,
+							transaction_id,
+							transactions.tenant,
+							account_id,
+							held_amount_in_cents,
+							debited_amount_in_cents,
+							credited_amount_in_cents,
+							last_played_sequence,
+							operation_pk,
+							operation_id,
+							operation_type,
+							amount_in_cents,
+							sequence
+			FROM transactions
+			JOIN operations USING(transaction_id, tenant)
+			WHERE transactions.tenant = $1
+			AND transactions.transaction_id = $2
+			ORDER BY operations.created DESC
+			LIMIT $3
+		) sq
+		GROUP BY sq.transaction_pk
 	`
 
+	limit := 3
 	var transaction Transaction
 	var operations []Operation
 	var aggregatedData json.RawMessage
-	row := tx.QueryRowContext(ctx, query, tenant, transactionID)
+	row := tx.QueryRowContext(ctx, query, tenant, transactionID, limit)
 	if err := row.Scan(
 		&transaction.TransactionPK,
 		&transaction.TransactionID,

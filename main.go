@@ -22,8 +22,8 @@ func main() {
 	logger = zap.NewExample().Sugar()
 	logger.Info("lesgo")
 
-	// dbServer, pool := MustSetupDB()
-	pool := MustSetupRealDB()
+	dbServer, pool := MustSetupDB()
+	// pool := MustSetupRealDB()
 
 	logger.Info("database setup")
 
@@ -52,28 +52,34 @@ func main() {
 		HandleCreateAccountWithContext(createContext, pool, w, r)
 	})
 	http.HandleFunc("/execute_operations", func(w http.ResponseWriter, r *http.Request) {
-		executeContext, executionCancel := context.WithTimeout(mainCtx, 500*time.Millisecond)
+		executeContext, executionCancel := context.WithTimeout(mainCtx, 2000*time.Millisecond)
 		defer executionCancel()
 
 		w.Header().Set("Content-Type", "application/json")
 		HandleExecuteOperationsWithContext(executeContext, pool, w, r)
 	})
 	http.HandleFunc("/get_account", func(w http.ResponseWriter, r *http.Request) {
-		getContext, getCancel := context.WithTimeout(mainCtx, 100*time.Millisecond)
+		getContext, getCancel := context.WithTimeout(mainCtx, 500*time.Millisecond)
 		defer getCancel()
 
 		w.Header().Set("Content-Type", "application/json")
 		HandleGetAccountWithContext(getContext, pool, w, r)
 	})
 	http.HandleFunc("/get_transaction", func(w http.ResponseWriter, r *http.Request) {
-		getContext, getCancel := context.WithTimeout(mainCtx, 100*time.Millisecond)
+		getContext, getCancel := context.WithTimeout(mainCtx, 500*time.Millisecond)
 		defer getCancel()
 
 		w.Header().Set("Content-Type", "application/json")
 		HandleGetTransactionWithContext(getContext, pool, w, r)
 	})
 
-	server := &http.Server{Addr: httpServerAddress, Handler: http.DefaultServeMux}
+	server := &http.Server{
+		ReadTimeout:  5000 * time.Millisecond,
+		WriteTimeout: 10000 * time.Millisecond,
+		IdleTimeout:  1000 * time.Millisecond,
+		Addr:         httpServerAddress,
+		Handler:      http.DefaultServeMux,
+	}
 	go func() {
 		if err := server.ListenAndServe(); err != http.ErrServerClosed {
 			logger.Errorf("error cycling server: %w", err)
@@ -100,9 +106,9 @@ func main() {
 	}
 
 	pool.Close()
-	// if err := dbServer.Stop(); err != nil {
-	// 	logger.Fatal(err)
-	// }
+	if err := dbServer.Stop(); err != nil {
+		logger.Fatal(err)
+	}
 }
 
 // MustLoadEnvVar takes an input env variable
