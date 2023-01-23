@@ -72,9 +72,11 @@ func (account Account) Play(transaction Transaction, operations []Operation) (Pl
 		case Hold:
 			playedTransaction.HeldAmountInCents += playedOperation.AmountInCents
 			playedAccount.RunningHeld += playedOperation.AmountInCents
+			playedAccount.RunningBalance -= playedOperation.AmountInCents
 		case Release:
 			playedTransaction.HeldAmountInCents -= playedOperation.AmountInCents
 			playedAccount.RunningHeld -= playedOperation.AmountInCents
+			playedAccount.RunningBalance += playedOperation.AmountInCents
 		case Debit:
 			playedTransaction.DebitedAmountInCents += playedOperation.AmountInCents
 			playedAccount.RunningBalance -= playedOperation.AmountInCents

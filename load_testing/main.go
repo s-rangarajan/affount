@@ -101,11 +101,10 @@ func main() {
 		var errCount, httpReadAccountErrorCount, httpReadTransactionErrorCount, httpExecuteOperationsErrorCount, opSuccessCount, txnSuccessCount, readSuccessCount uint
 		go func() {
 			ticker := time.NewTicker(1000 * time.Millisecond)
-			log.Printf("errs,ReadAcctErrors,ReadTxnErrors,ExecOpsErrors,OpSuccesses,TxnSuccesses,ReadSuccesses")
 			for {
 				select {
 				case <-ticker.C:
-					log.Printf("%d,%d,%d,%d,%d,%d,%d", errCount, httpReadAccountErrorCount, httpReadTransactionErrorCount, httpExecuteOperationsErrorCount, opSuccessCount, txnSuccessCount, readSuccessCount)
+					log.Printf(fmt.Sprintf("errs: %d | ReadAcctErrors: %d | ReadTxnErrors: %d | ExecOpsErrors: %d | OpSuccesses: %d | TxnSuccesses: %d | ReadSuccesses: %d", errCount, httpReadAccountErrorCount, httpReadTransactionErrorCount, httpExecuteOperationsErrorCount, opSuccessCount, txnSuccessCount, readSuccessCount))
 				}
 			}
 		}()
